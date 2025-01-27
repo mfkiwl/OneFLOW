@@ -1,4 +1,4 @@
-cmake_minimum_required ( VERSION 3.20 )
+cmake_minimum_required ( VERSION 3.31 )
 
 if ( DEFINED ENV{VCPKG_ROOT} AND NOT DEFINED CMAKE_TOOLCHAIN_FILE )
     message(STATUS "VCPKG_ROOT: $ENV{VCPKG_ROOT}")

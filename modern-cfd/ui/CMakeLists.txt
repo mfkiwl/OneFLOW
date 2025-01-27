@@ -1,9 +1,6 @@
-cmake_minimum_required ( VERSION 3.20 )
+cmake_minimum_required ( VERSION 3.31 )
 
-#set( VCPKG_ROOT "c:/dev/vcpkg" )
-#set( CMAKE_TOOLCHAIN_FILE "${VCPKG_ROOT}/scripts/buildsystems/vcpkg.cmake" )
-
-#project( OneFLOW-UI )
+project( OneFLOW-UI )
 set ( GUI_NAME "OneFLOW-UI" )
 
 #message( STATUS "VCPKG_ROOT=${VCPKG_ROOT}")
@@ -14,16 +11,26 @@ set ( PRJ_COMPILE_DEFINITIONS )
 set ( PRJ_LIBRARIES )
 set ( PRJ_INCLUDE_DIRS )
 
-find_package ( Qt6 COMPONENTS Widgets )
+set(CMAKE_AUTOUIC ON)
+set(CMAKE_AUTOMOC ON)
+set(CMAKE_AUTORCC ON)
+
+find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets)
+#find_package ( Qt6 REQUIRED COMPONENTS Widgets )
+#find_package ( Qt6 COMPONENTS Widgets )
+
+
+find_package(QT NAMES Qt6 Qt5 REQUIRED COMPONENTS Widgets)
+find_package(Qt${QT_VERSION_MAJOR} REQUIRED COMPONENTS Widgets)
 find_package ( Qt6 REQUIRED COMPONENTS Sql )
 
 #list ( APPEND PRJ_LIBRARIES Qt6::Core )
 list ( APPEND PRJ_LIBRARIES Qt6::Sql )
 list ( APPEND PRJ_LIBRARIES Qt6::Widgets )
 
-#list ( APPEND PRJ_INCLUDE_DIRS "c:\Program Files\MySQL\MySQL Server 8.0\include" )
-list ( APPEND PRJ_LIBRARIES "c:/Program Files/MySQL/MySQL Server 8.0/lib/libmysql.lib" )
-
+#list ( APPEND PRJ_INCLUDE_DIRS "C:/Program Files/MySQL/MySQL Server 9.1/include" )
+list ( APPEND PRJ_LIBRARIES "C:/Program Files/MySQL/MySQL Server 9.1/lib/libmysql.lib" )
 
 get_directory_property( my_system_targets DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} BUILDSYSTEM_TARGETS )
 get_directory_property( my_import_targets DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} IMPORTED_TARGETS )
@@ -78,7 +85,7 @@ message ( STATUS "OUTPUT_BIN_DIR = ${OUTPUT_BIN_DIR}" )
 
 add_custom_command ( TARGET ${GUI_NAME}
                     POST_BUILD
-					COMMAND $<$<CONFIG:Debug>:${windeployqt_debug}>$<$<CONFIG:Release>:${windeployqt_release}> $<TARGET_FILE:${GUI_NAME}>
+					COMMAND $<$<CONFIG:Debug>:${windeployqt_release}>$<$<CONFIG:Release>:${windeployqt_release}> $<TARGET_FILE:${GUI_NAME}>
                     COMMENT "Run Qt6::windeployqt" )
 
 

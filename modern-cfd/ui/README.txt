@@ -1,5 +1,8 @@
 cmake  ../ -D CMAKE_TOOLCHAIN_FILE="c:/dev/vcpkg/scripts/buildsystems/vcpkg.cmake"
 
+qt6.8
+cmake .. -DCMAKE_PREFIX_PATH:PATH="C:/local/Qt/6.8.1/msvc2022_64"
+
 The package python3 is compatible with built-in CMake targets:
 
     find_package(Python3 COMPONENTS Development REQUIRED)

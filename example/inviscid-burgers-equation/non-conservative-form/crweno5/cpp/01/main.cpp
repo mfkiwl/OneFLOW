@@ -1,5 +1,5 @@
-#include <cmath>
 #include <vector>
+#include <cmath>
 #include <print>
 #include <numbers>
 #include <fstream>
@@ -9,13 +9,50 @@ auto SQR(Args... args) {
     return (... + (args * args));
 }
 
-void DumpCsvFile( const std::string & filename, std::vector<double> & x, std::vector<std::vector<double>> & u );
-double wcL( double v1, double v2, double v3, double v4, double v5 );
-double wcR( double v1, double v2, double v3, double v4, double v5 );
+void thomas_algorithm( const std::vector<double> & a,
+    const std::vector<double> & b,
+    const std::vector<double> & c,
+    const std::vector<double> & d,
+    std::vector<double> & x )
+{
+    size_t N = d.size();
+
+    std::vector<double> c_star( N, 0.0 );
+    std::vector<double> d_star( N, 0.0 );
+
+    c_star[ 0 ] = c[ 0 ] / b[ 0 ];
+    d_star[ 0 ] = d[ 0 ] / b[ 0 ];
+
+    for ( int i = 1; i < N; ++ i )
+    {
+        double coef = 1.0 / ( b[ i ] - a[ i ] * c_star[ i - 1 ] );
+        c_star[ i ] = c[ i ] * coef;
+        d_star[ i ] = ( d[ i ] - a[ i ] * d_star[ i - 1 ] ) * coef;
+    }
+
+    x[ N - 1 ] = d_star[ N - 1 ];
+
+    for ( int i = N - 2; i >= 0; -- i )
+    {
+        x[ i ] = d_star[ i ] - c_star[ i ] * x[ i + 1 ];
+    }
+}
+
+void crwcL( double v1, double v2, double v3, double v4, double v5,
+    double & a1, double & a2, double & a3,
+    double & b1, double & b2, double & b3 );
+void crwcR( double v1, double v2, double v3, double v4, double v5,
+    double & a1, double & a2, double & a3,
+    double & b1, double & b2, double & b3 );
+void crwenoL( int nx, std::vector<double> & u, std::vector<double> & f );
+void crwenoR( int nx, std::vector<double> & u, std::vector<double> & f );
 void rhs( int nx, double dx, std::vector<double> & u, std::vector<double> & r );
 void numerical( int nx, int ns, int nt, double dx, double dt, std::vector<std::vector<double>> & u );
+void DumpCsvFile( const std::string & filename, std::vector<double> & x, std::vector<std::vector<double>> & u );
 
-double wcL( double v1, double v2, double v3, double v4, double v5 )
+void crwcL( double v1, double v2, double v3, double v4, double v5,
+    double & a1, double & a2, double & a3,
+    double & b1, double & b2, double & b3 )
 {
     double eps = 1.0e-6;
 
@@ -25,26 +62,26 @@ double wcL( double v1, double v2, double v3, double v4, double v5 )
     double s3 = ( 13.0 / 12.0 ) * SQR( v3 - 2.0 * v4 + v5 ) + 0.25 * SQR( 3.0 * v3 - 4.0 * v4 + v5 );
 
     // computing nonlinear weights w1, w2, w3
-    double c1 = 1.0e-1 / ( SQR( eps + s1 ) );
-    double c2 = 6.0e-1 / ( SQR( eps + s2 ) );
+    double c1 = 2.0e-1 / ( SQR( eps + s1 ) );
+    double c2 = 5.0e-1 / ( SQR( eps + s2 ) );
     double c3 = 3.0e-1 / ( SQR( eps + s3 ) );
 
     double w1 = c1 / ( c1 + c2 + c3 );
     double w2 = c2 / ( c1 + c2 + c3 );
     double w3 = c3 / ( c1 + c2 + c3 );
 
-    // candiate stencils
-    double q1 = v1 / 3.0 - 7.0 / 6.0 * v2 + 11.0 / 6.0 * v3;
-    double q2 = -v2 / 6.0 + 5.0 / 6.0 * v3 + v4 / 3.0;
-    double q3 = v3 / 3.0 + 5.0 / 6.0 * v4 - v5 / 6.0;
+    a1 = ( 2.0 * w1 + w2 ) / 3.0;
+    a2 = ( w1 + 2.0 * w2 + 2.0 * w3 ) / 3.0;
+    a3 = w3 / 3.0;
 
-    // reconstructed value at interface
-    double f = ( w1 * q1 + w2 * q2 + w3 * q3 );
-
-    return f;
+    b1 = w1 / 6.0;
+    b2 = ( 5.0 * w1 + 5.0 * w2 + w3 ) / 6.0;
+    b3 = ( w2 + 5.0 * w3 ) / 6.0;
 }
 
-double wcR( double v1, double v2, double v3, double v4, double v5 )
+void crwcR( double v1, double v2, double v3, double v4, double v5,
+    double & a1, double & a2, double & a3,
+    double & b1, double & b2, double & b3 )
 {
     double eps = 1.0e-6;
 
@@ -55,41 +92,37 @@ double wcR( double v1, double v2, double v3, double v4, double v5 )
 
     // computing nonlinear weights w1, w2, w3
     double c1 = 3.0e-1 / SQR( eps + s1 );
-    double c2 = 6.0e-1 / SQR( eps + s2 );
-    double c3 = 1.0e-1 / SQR( eps + s3 );
+    double c2 = 5.0e-1 / SQR( eps + s2 );
+    double c3 = 2.0e-1 / SQR( eps + s3 );
 
     double w1 = c1 / ( c1 + c2 + c3 );
     double w2 = c2 / ( c1 + c2 + c3 );
     double w3 = c3 / ( c1 + c2 + c3 );
 
-    // candiate stencils;
-    double q1 = -v1 / 6.0 + 5.0 / 6.0 * v2 + v3 / 3.0;
-    double q2 = v2 / 3.0 + 5.0 / 6.0 * v3 - v4 / 6.0;
-    double q3 = 11.0 / 6.0 * v3 - 7.0 / 6.0 * v4 + v5 / 3.0;
+    a1 = w1 / 3.0;
+    a2 = ( w3 + 2.0 * w2 + 2.0 * w1 ) / 3.0;
+    a3 = ( 2.0 * w3 + w2 ) / 3.0;
 
-    // reconstructed value at interface
-    double f = ( w1 * q1 + w2 * q2 + w3 * q3 );
-
-    return f;
+    b1 = ( w2 + 5.0 * w1 ) / 6.0;
+    b2 = ( 5.0 * w3 + 5.0 * w2 + w1 ) / 6.0;
+    b3 = w3 / 6.0;
 }
 
-//-----------------------------------------------------------------------------
-// WENO reconstruction for upwind direction (positive; left to right)
-// u(i): solution values at finite difference grid nodes i = 1,...,N+1
-// f(j): reconstructed values at nodes j = i+1/2; j = 1,...,N
-//-----------------------------------------------------------------------------
-void wenoL( int nx, std::vector<double> & u, std::vector<double> & f )
+void crwenoL( int nx, std::vector<double> & u, std::vector<double> & f )
 {
+    std::vector<double> a( nx );
+    std::vector<double> b( nx );
+    std::vector<double> c( nx );
+    std::vector<double> r( nx );
+
     int i;
     double v1, v2, v3, v4, v5;
+    double a1, a2, a3, b1, b2, b3;
 
     i = 0;
-    v1 = 3.0 * u[ i ] - 2.0 * u[ i + 1 ];
-    v2 = 2.0 * u[ i ] - u[ i + 1 ];
-    v3 = u[ i ];
-    v4 = u[ i + 1 ];
-    v5 = u[ i + 2 ];
-    f[ i ] = wcL( v1, v2, v3, v4, v5 );
+    b[ i ] = 2.0 / 3.0;
+    c[ i ] = 1.0 / 3.0;
+    r[ i ] = ( u[ i ] + 5.0 * u[ i + 1 ] ) / 6.0;
 
     i = 1;
     v1 = 2.0 * u[ i - 1 ] - u[ i ];
@@ -97,7 +130,12 @@ void wenoL( int nx, std::vector<double> & u, std::vector<double> & f )
     v3 = u[ i ];
     v4 = u[ i + 1 ];
     v5 = u[ i + 2 ];
-    f[ i ] = wcL( v1, v2, v3, v4, v5 );
+
+    crwcL( v1, v2, v3, v4, v5, a1, a2, a3, b1, b2, b3 );
+    a[ i ] = a1;
+    b[ i ] = a2;
+    c[ i ] = a3;
+    r[ i ] = b1 * u[ i - 1 ] + b2 * u[ i ] + b3 * u[ i + 1 ];
 
     for ( int i = 2; i < nx - 1; ++ i )
     {
@@ -106,35 +144,37 @@ void wenoL( int nx, std::vector<double> & u, std::vector<double> & f )
         v3 = u[ i ];
         v4 = u[ i + 1 ];
         v5 = u[ i + 2 ];
-        f[ i ] = wcL( v1, v2, v3, v4, v5 );
+        crwcL( v1, v2, v3, v4, v5, a1, a2, a3, b1, b2, b3 );
+        a[ i ] = a1;
+        b[ i ] = a2;
+        c[ i ] = a3;
+        r[ i ] = b1 * u[ i - 1 ] + b2 * u[ i ] + b3 * u[ i + 1 ];
     }
 
     i = nx - 1;
-    v1 = u[ i - 2 ];
-    v2 = u[ i - 1 ];
-    v3 = u[ i ];
-    v4 = u[ i + 1 ];
-    v5 = 2.0 * u[ i + 1 ] - u[ i ];
-    f[ i ] = wcL( v1, v2, v3, v4, v5 );
+    a[ i ] = 1.0 / 3.0;
+    b[ i ] = 2.0 / 3.0;
+    r[ i ] = ( 5.0 * u[ i ] + u[ i + 1 ] ) / 6.0;
+
+    thomas_algorithm( a, b, c, r, f );
 }
 
-//-----------------------------------------------------------------------------
-// CRWENO reconstruction for downwind direction (negative; right to left)
-// u(i): solution values at finite difference grid nodes i = 1,...,N+1
-// f(j): reconstructed values at nodes j = i-1/2; j = 2,...,N+1
-//-----------------------------------------------------------------------------
-void wenoR( int nx, std::vector<double> & u, std::vector<double> & f )
+void crwenoR( int nx, std::vector<double> & u, std::vector<double> & f )
 {
+    std::vector<double> a( nx );
+    std::vector<double> b( nx );
+    std::vector<double> c( nx );
+    std::vector<double> r( nx );
+
     int i;
     double v1, v2, v3, v4, v5;
+    double a1, a2, a3, b1, b2, b3;
 
     i = 1;
-    v1 = 2.0 * u[ i - 1 ] - u[ i ];
-    v2 = u[ i - 1 ];
-    v3 = u[ i ];
-    v4 = u[ i + 1 ];
-    v5 = u[ i + 2 ];
-    f[ i ] = wcR( v1, v2, v3, v4, v5 );
+    b[ i - 1 ] = 2.0 / 3.0;
+    c[ i - 1 ] = 1.0 / 3.0;
+    r[ i - 1 ] = ( u[ i - 1 ] + 5.0 * u[ i ] ) / 6.0;
+
     for ( int i = 2; i < nx - 1; ++ i )
     {
         v1 = u[ i - 2 ];
@@ -142,7 +182,13 @@ void wenoR( int nx, std::vector<double> & u, std::vector<double> & f )
         v3 = u[ i ];
         v4 = u[ i + 1 ];
         v5 = u[ i + 2 ];
-        f[ i ] = wcR( v1, v2, v3, v4, v5 );
+
+        crwcR( v1, v2, v3, v4, v5, a1, a2, a3, b1, b2, b3 );
+
+        a[ i - 1 ] = a1;
+        b[ i - 1 ] = a2;
+        c[ i - 1 ] = a3;
+        r[ i - 1 ] = b1 * u[ i - 1 ] + b2 * u[ i ] + b3 * u[ i + 1 ];
     }
 
     i = nx - 1;
@@ -151,15 +197,19 @@ void wenoR( int nx, std::vector<double> & u, std::vector<double> & f )
     v3 = u[ i ];
     v4 = u[ i + 1 ];
     v5 = 2.0 * u[ i + 1 ] - u[ i ];
-    f[ i ] = wcR( v1, v2, v3, v4, v5 );
+
+    crwcR( v1, v2, v3, v4, v5, a1, a2, a3, b1, b2, b3 );
+    a[ i - 1 ] = a1;
+    b[ i - 1 ] = a2;
+    c[ i - 1 ] = a3;
+    r[ i - 1 ] = b1 * u[ i - 1 ] + b2 * u[ i ] + b3 * u[ i + 1 ];
 
     i = nx;
-    v1 = u[ i - 2 ];
-    v2 = u[ i - 1 ];
-    v3 = u[ i ];
-    v4 = 2.0 * u[ i ] - u[ i - 1 ];
-    v5 = 3.0 * u[ i ] - 2.0 * u[ i - 1 ];
-    f[ i ] = wcR( v1, v2, v3, v4, v5 );
+    a[ i - 1 ] = 1.0 / 3.0;
+    b[ i - 1 ] = 2.0 / 3.0;
+    r[ i - 1 ] = ( 5.0 * u[ i - 1 ] + u[ i ] ) / 6.0;
+
+    thomas_algorithm( a, b, c, r, f );
 }
 
 //-----------------------------------------------------------------------------
@@ -168,10 +218,10 @@ void wenoR( int nx, std::vector<double> & u, std::vector<double> & f )
 void rhs( int nx, double dx, std::vector<double> & u, std::vector<double> & r )
 {
     std::vector<double> uL( nx, 0 );
-    std::vector<double> uR( nx + 1, 0 );
+    std::vector<double> uR( nx, 0 );
 
-    wenoL( nx, u, uL );
-    wenoR( nx, u, uR );
+    crwenoL( nx, u, uL );
+    crwenoR( nx, u, uR );
 
     for ( int i = 1; i < nx; ++ i )
     {
@@ -181,7 +231,7 @@ void rhs( int nx, double dx, std::vector<double> & u, std::vector<double> & r )
         }
         else
         {
-            r[ i ] = - u[ i ] * ( uR[ i + 1 ] - uR[ i ] ) / dx;
+            r[ i ] = - u[ i ] * ( uR[ i ] - uR[ i - 1 ] ) / dx;
         }
     }
 }
@@ -257,7 +307,7 @@ void numerical( int nx, int ns, int nt, double dx, double dt, std::vector<std::v
 void DumpCsvFile( const std::string &filename, std::vector<double> &x, std::vector<std::vector<double>> &u )
 {
     std::fstream file;
-    file.open(filename.c_str(), std::fstream::out);
+    file.open( filename.c_str(), std::fstream::out );
     for ( int i = 0; i < u.size(); ++ i )
     {
         std::string str = {};
@@ -303,6 +353,5 @@ int main( int argc, char ** argv )
     }
 
     numerical( nx, ns, nt, dx, dt, u );
-
     return 0;
 }
